@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: idbi-apim-msr1-deploy
+  labels:
+    app: idbi-apim-msr1-deploy
+  namespace: nsp-idbi-apim-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: idbi-apim-msr1
+  template:
+    metadata:
+      labels:
+        app: idbi-apim-msr1
+    spec:
+      terminationGracePeriodSeconds: 60
+      affinity:
+      # Pods will be placed in the worker node that has the label terracotta-node=terracotta
+        nodeAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+             nodeSelectorTerms:
+             - matchExpressions:
+               - key: webmethod_integration-node
+                 operator: In
+                 values:
+                   - webmethod_integration-node
+      # Pods will label app=idbi-apim-tsa-cluster will not be placed together
+        podAntiAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+             - labelSelector:
+                 matchExpressions:
+                 - key: app
+                   operator: In
+                   values:
+                     - idbi-apim-msr1
+               topologyKey: "kubernetes.io/hostname"
+
+      # Toleration condition for Pods when the node is tainted and the subsequent effect
+      tolerations:
+       - key: "node-role.kubernetes.io/webmethod_integration"
+         operator: "Exists"
+         effect: "NoSchedule"
+      containers:
+      - name: idbi-apim-msr1
+        image: ismsr1image:v1.1
+        # imagePullPolicy: Never
+        ports:
+        - name: primary-port
+          containerPort: 5555
+        - name: ssl-port
+          containerPort: 5543
+        - name: diagnostic-port
+          containerPort: 9999
+        resources:
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "1.5Gi"
+        readinessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /invoke/wm.server/ping
+            port: 5543
+          initialDelaySeconds: 90
+          periodSeconds: 60
+          failureThreshold: 6
+        livenessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /invoke/wm.server/ping
+            port: 5543
+          initialDelaySeconds: 90
+          periodSeconds: 60
+          failureThreshold: 6
+        volumeMounts:
+        - name: msr1-license
+          mountPath: /opt/softwareag/IntegrationServer/config/licenseKey.xml
+          subPath: msr1-licensekey.xml
+          readOnly: false
+        #- name: serverconfig
+         # mountPath: /opt/softwareag/IntegrationServer/config/server.cnf
+          #subPath: server.cnf
+          #readOnly: false
+        - name: app-prop
+          mountPath: /opt/softwareag/IntegrationServer/application.properties
+          subPath: application.properties
+          readOnly: false
+        - name: integration-server-logs
+          mountPath: /opt/softwareag/IntegrationServer/logs/
+          readOnly: false
+      volumes:
+      - name: msr1-license
+        configMap:
+          name: idbi-apim-msr1-license-config
+          items:
+          - key: msr1-licensekey.xml
+            path: msr1-licensekey.xml
+          defaultMode: 0777
+     # - name: tsa-license
+      #  configMap:
+       #   name: apim-license-config
+        #  items:
+         # - key: terracotta-license.key
+          #  path: terracotta-license.key
+          #defaultMode: 0777
+      #- name: custom-wrapper
+       # configMap:
+        #  name: idbi-apim-msr1-config
+         # items:
+          #- key: custom_wrapper.conf
+           # path: custom_wrapper.conf
+          #defaultMode: 0777
+      #- name: serverconfig
+      #  configMap:
+       #   name: idbi-apim-msr1-config
+        #  items:
+         # - key: server.cnf
+          #  path: server.cnf
+          #defaultMode: 0777
+      - name: app-prop
+        configMap:
+          name: idbi-apim-msr1-config
+          items:
+          - key: application.properties
+            path: application.properties
+          defaultMode: 0777
+      - name: integration-server-logs
+        hostPath:
+             path: /data/msr1/is-logs
+             type: DirectoryOrCreate
