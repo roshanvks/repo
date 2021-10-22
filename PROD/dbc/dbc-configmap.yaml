@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: idbi-apim-dbc-config
+  namespace: nsp-idbi-apim-prod
+data:
+  DB_TYPE: oracle
+  DB_URL: "jdbc:wm:oracle://10.142.15.231:1521;ServiceName=ESBPROD"

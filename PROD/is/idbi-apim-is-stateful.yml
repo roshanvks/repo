@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: 
+  name: idbi-apim-is-cluster
+  labels:
+    app: idbi-apim-is-cluster
+  namespace: nsp-idbi-apim-prod
+spec:
+  serviceName: idbi-apim-is-svc-h
+  replicas: 2
+  selector:
+    matchLabels:
+      app: idbi-apim-is
+  template:
+    metadata:
+      labels:
+        app: idbi-apim-is
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: idbi-apim-is
+        image: mymsrimage:V1.0
+        # imagePullPolicy: Never
+        ports:
+        - name: primary-port
+          containerPort: 5555
+        - name: ssl-port
+          containerPort: 5543
+        - name: diagnostic-port
+          containerPort: 9999
+        resources:
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "1.5Gi"
+#        readinessProbe:
+#          httpGet:
+#            scheme: HTTPS
+#            path: /invoke/wm.server/ping
+#            port: 5543
+#          initialDelaySeconds: 90
+#          periodSeconds: 60
+#          failureThreshold: 6
+#        livenessProbe:
+#          httpGet:
+#            scheme: HTTPS
+#            path: /invoke/wm.server/ping
+#            port: 5543
+#          initialDelaySeconds: 90
+#          periodSeconds: 60
+#          failureThreshold: 6
+        volumeMounts:
+        - name: msr1-license
+          mountPath: /opt/softwareag/IntegrationServer/config/licenseKey.xml
+          subPath: msr1-licensekey.xml
+          readOnly: false
+        #- name: serverconfig
+         # mountPath: /opt/softwareag/IntegrationServer/config/server.cnf
+          #subPath: server.cnf
+          #readOnly: false
+        - name: app-prop
+          mountPath: /opt/softwareag/IntegrationServer/application.properties
+          subPath: application.properties
+          readOnly: false
+        - name: integration-server-logs
+          mountPath: /opt/softwareag/IntegrationServer/logs/
+        - name: is-csq
+          mountPath: /opt/softwareag/IntegrationServer/db
+      volumes:
+      - name: msr1-license
+        configMap:
+          name: idbi-apim-msr1-license-config
+          items:
+          - key: msr1-licensekey.xml
+            path: msr1-licensekey.xml
+          defaultMode: 0777
+      - name: tsa-license
+        configMap:
+          name: idbi-apim-msr1-license-config
+          items:
+          - key: terracotta-license.key
+            path: terracotta-license.key
+          defaultMode: 0777
+      - name: custom-wrapper
+        configMap:
+          name: idbi-apim-msr1-config
+          items:
+          - key: custom_wrapper.conf
+            path: custom_wrapper.conf
+          defaultMode: 0777
+      #- name: serverconfig
+      #  configMap:
+       #   name: idbi-apim-msr1-config
+        #  items:
+         # - key: server.cnf
+          #  path: server.cnf
+          #defaultMode: 0777
+      - name: app-prop
+        configMap:
+          name: idbi-apim-msr1-config
+          items:
+          - key: application.properties
+            path: application.properties
+          defaultMode: 0777
+  volumeClaimTemplates:
+    - metadata:
+        name: integration-server-logs
+      spec:
+        accessModes:
+          - ReadWriteMany
+        storageClassName: manual
+        resources:
+          requests:
+            storage: 5Gi
+    - metadata:
+       name: is-csq
+      spec:
+        accessModes:
+          - ReadWriteMany
+        storageClassName: manual
+        resources:
+          requests:
+            storage: 5Gi
+
